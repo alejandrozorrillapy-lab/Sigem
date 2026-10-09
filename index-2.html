@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SIGEM</title>
+<style>
+:root{--bg:#eef2f1;--ink:#1b2a29;--mute:#5d6f6d;--line:#cfdad8;--card:#fff;--ac:#0f766e;--warn:#b45309;--bad:#b91c1c;font-family:"Trebuchet MS","Segoe UI",sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:18px}
+header{background:var(--ink);color:#fff;display:flex;gap:6px;align-items:center;padding:8px 14px;flex-wrap:wrap}
+header b{font-size:22px;margin-right:14px}
+nav button{background:none;border:0;color:#cfe3e0;font:inherit;padding:12px 18px;border-radius:8px;cursor:pointer}
+nav button.on{background:var(--ac);color:#fff}
+.hd{margin-left:auto;font-size:15px}
+main{padding:14px;max-width:1200px;margin:auto}
+section{display:none}section.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:14px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+input,select{font:inherit;padding:12px;border:1px solid var(--line);border-radius:8px;width:100%}
+.b{font:inherit;background:var(--ac);color:#fff;border:0;border-radius:8px;padding:12px 18px;cursor:pointer;display:inline-block}
+.b.s{background:#e3ebea;color:var(--ink)}.b.d{background:var(--bad)}.b:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #f59e0b}
+.prods{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-top:10px;max-height:60vh;overflow:auto}
+.prod{text-align:left;background:#f7faf9;border:1px solid var(--line);border-radius:10px;padding:12px;cursor:pointer;font:inherit}
+.prod:disabled{opacity:.45;cursor:not-allowed}
+.prod small{display:block;color:var(--mute)}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}
+td.n,th.n{text-align:right}
+.tag{font-size:14px;padding:3px 8px;border-radius:99px;color:#fff;white-space:nowrap}
+.low{background:var(--bad)}.max{background:var(--warn)}
+#alertas{background:#fff4e5;border:1px solid #f1c27d;border-radius:10px;padding:12px;margin-bottom:14px;display:none}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px}
+.f label{font-size:14px;color:var(--mute)}
+.total{font-size:34px;font-weight:700;margin:10px 0}
+.mute{color:var(--mute);font-size:15px}
+#login{max-width:380px;margin:12vh auto;padding:0 14px}
+#tk,#md{position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:20;padding:14px}
+#tk[hidden],#md[hidden]{display:none}
+#md .card,#tk .card{max-width:380px;width:100%;max-height:90vh;overflow:auto;margin:0}
+#tkpre{font:15px monospace;white-space:pre-wrap;margin:0 0 12px}
+@media print{body>*{display:none!important}body>#tk{display:block!important;position:static;background:none;padding:0}#tk .card{border:0;max-width:300px}#tk .no{display:none}}
+#msg{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:14px 22px;border-radius:10px;display:none;z-index:9}
+#msg.bad{background:var(--bad)}
+</style>
+</head>
+<body>
+<div id="app" hidden>
+<header>
+  <b>SIGEM</b><nav id="nav"></nav>
+  <div class="row hd">
+    <select id="moneda" style="width:auto;padding:8px"><option value="PYG">Guaraníes (₲)</option><option value="USD">Dólares (US$)</option></select>
+    <input id="tasa" type="text" inputmode="decimal" placeholder="₲ por US$" title="Guaraníes por 1 dólar" style="width:110px;padding:8px">
+    <span id="quien"></span><button class="b s" id="salir" style="padding:8px 14px">Salir</button>
+  </div>
+</header>
+<main>
+<div id="alertas"></div>
+
+<section id="s_venta" class="on"><div class="grid">
+  <div class="card"><input id="q" placeholder="Buscar por nombre o código"><div class="prods" id="lista"></div></div>
+  <div class="card">
+    <h3 style="margin-top:0">Carrito</h3>
+    <table id="carrito"></table>
+    <div class="total" id="total"></div>
+    <select id="cli"></select>
+    <input id="recibido" type="text" inputmode="decimal" placeholder="Monto recibido (opcional)" style="margin-top:10px">
+    <div id="vuelto" style="margin-top:6px;font-weight:700"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="b" id="cobrar" style="flex:1">Confirmar venta</button>
+      <button class="b s" id="vaciar">Vaciar</button><button class="b s" id="ticket">Último ticket</button>
+    </div>
+  </div>
+</div></section>
+
+<section id="s_inv">
+  <div class="card">
+    <div class="f">
+      <div><label>Código</label><input id="p_id"></div><div><label>Nombre</label><input id="p_nombre"></div>
+      <div><label>Precio de costo</label><input id="p_costo" type="text" inputmode="decimal"></div>
+      <div><label>Precio de venta</label><input id="p_venta" type="text" inputmode="decimal"></div>
+      <div><label>Stock actual</label><input id="p_stock" type="text" inputmode="decimal"></div>
+      <div><label>Stock mínimo</label><input id="p_min" type="text" inputmode="decimal"></div>
+      <div><label>Stock máximo</label><input id="p_max" type="text" inputmode="decimal"></div>
+    </div>
+    <div class="row"><button class="b" id="p_guardar">Guardar producto</button><button class="b s" id="p_limpiar">Limpiar</button></div>
+  </div>
+  <div class="card"><table id="t_inv"></table></div>
+</section>
+
+<section id="s_cli">
+  <div class="card"><div class="f"><div><label>Nombre</label><input id="c_nombre"></div><div><label>Teléfono</label><input id="c_tel"></div></div>
+  <button class="b" id="c_guardar">Agregar cliente</button></div>
+  <div class="card"><table id="t_cli"></table></div>
+</section>
+
+<section id="s_rep">
+  <div class="card row">
+    <select id="periodo" style="max-width:220px"><option value="dia">Hoy</option><option value="semana">Últimos 7 días</option><option value="mes">Últimos 30 días</option></select>
+    <div class="total" id="r_total" style="margin:0;font-size:24px"></div>
+  </div>
+  <div class="grid">
+    <div class="card"><h3 style="margin-top:0">Ventas</h3><table id="r_ventas"></table></div>
+    <div>
+      <div class="card"><h3 style="margin-top:0">Más vendidos</h3><table id="r_top"></table></div>
+      <div class="card"><h3 style="margin-top:0">Stock crítico</h3><table id="r_crit"></table></div>
+    </div>
+  </div>
+</section>
+
+<section id="s_aj">
+  <div class="card"><h3 style="margin-top:0">Usuarios</h3>
+    <div class="f"><div><label>Usuario</label><input id="u_nombre"></div><div><label>Contraseña (mínimo 4 caracteres)</label><input id="u_pass" type="password"></div>
+    <div><label>Rol</label><select id="u_rol"><option value="cajero">Cajero (vende y cobra)</option><option value="admin">Administrador (todo)</option></select></div></div>
+    <button class="b" id="u_guardar">Agregar usuario</button><table id="t_users" style="margin-top:10px"></table>
+  </div>
+  <div class="card"><h3 style="margin-top:0">Respaldo</h3>
+    <div class="row"><button class="b" id="exp">Descargar respaldo</button><button class="b s" id="cpy">Copiar respaldo</button>
+    <label class="b s" style="cursor:pointer">Restaurar desde archivo<input id="imp" type="file" accept=".json,.txt,application/json,text/plain" hidden></label>
+    <button class="b s" id="pst">Restaurar pegando texto</button></div>
+    <p class="mute">Los datos viven solo en este navegador. Descarga un respaldo seguido y guárdalo en otro lugar. Si el navegador bloquea la descarga, usa «Copiar respaldo» y guarda el texto en una nota o correo.</p>
+  </div>
+</section>
+</main>
+</div>
+<div id="login"></div>
+<div id="tk" hidden><div class="card"><pre id="tkpre"></pre><div class="row no"><button class="b" id="tkprint">Imprimir</button><button class="b s" id="tkclose">Cerrar</button></div></div></div>
+<div id="md" hidden><div class="card"><h3 id="md_t" style="margin-top:0"></h3><div id="md_b"></div><div class="row" id="md_btn" style="margin-top:12px"></div></div></div>
+<div id="msg"></div>
+
+<script>
+const $=id=>document.getElementById(id), K="sigem_v1";
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const mem={};let persiste=true;
+const LS={get(k){try{return localStorage.getItem(k)}catch(e){persiste=false;return null}},set(k,v){try{localStorage.setItem(k,v);return true}catch(e){persiste=false;return false}}};
+const SS={get(k){try{return sessionStorage.getItem(k)}catch(e){return mem[k]||null}},set(k,v){try{sessionStorage.setItem(k,v)}catch(e){mem[k]=v}},del(k){try{sessionStorage.removeItem(k)}catch(e){delete mem[k]}}};
+let db=null; try{db=JSON.parse(LS.get(K))}catch(e){}
+db=db||{cfg:{moneda:"PYG",tasa:7500},users:[],productos:[],clientes:[],ventas:[],cobros:[],seq:{v:0,c:0,u:0}};
+let me=null, tab="venta", cart={}, tot=0, ult=null, editando=null;
+function save(){if(!LS.set(K,JSON.stringify(db)))aviso("No se pudieron guardar los datos en este navegador. Descarga un respaldo.",true)}
+const usd=()=>db.cfg.moneda==="USD", rate=()=>usd()?db.cfg.tasa:1;
+const m=n=>usd()?"US$ "+(n/db.cfg.tasa).toFixed(2):"₲ "+Math.round(n).toLocaleString("es-PY");
+const toBase=v=>Math.round((+v||0)*rate()), fromBase=n=>usd()?+(n/db.cfg.tasa).toFixed(2):Math.round(n);
+function aviso(t,bad){const e=$("msg");e.textContent=t;e.className=bad?"bad":"";e.style.display="block";clearTimeout(aviso.t);aviso.t=setTimeout(()=>e.style.display="none",3500)}
+const fecha=f=>new Date(f).toLocaleString("es-PY");
+
+/* ---------- Usuarios ---------- */
+async function hash(pw,salt){
+  const s=salt+pw;
+  if(window.crypto&&crypto.subtle){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s));return "s:"+[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+  let a=0xdeadbeef,c=0x41c6ce57;for(let i=0;i<s.length;i++){const k=s.charCodeAt(i);a=Math.imul(a^k,2654435761);c=Math.imul(c^k,1597334677)}
+  return "f:"+(a>>>0).toString(16)+(c>>>0).toString(16);
+}
+async function nuevoUsuario(nombre,pw,rol){const salt=Math.random().toString(36).slice(2),u={id:++db.seq.u,nombre,rol,salt,hash:await hash(pw,salt)};db.users.push(u);save();return u}
+function loginUI(){
+  me=null;$("app").hidden=true;$("login").hidden=false;const primero=!db.users.length;
+  $("login").innerHTML=`<div class="card"><h2 style="margin-top:0">${primero?"Crea el usuario administrador":"Ingresar a SIGEM"}</h2>
+  <div class="f" style="grid-template-columns:1fr"><div><label>Usuario</label><input id="lu" autocomplete="username"></div>
+  <div><label>Contraseña</label><input id="lp" type="password" autocomplete="current-password"></div></div>
+  <p class="mute" style="margin:0 0 10px">${primero?"La contraseña debe tener al menos 4 caracteres.":""}${persiste?"":" Este navegador no permite guardar datos: abre el archivo directamente desde tu equipo."}</p>
+  <p id="lerr" style="color:var(--bad);min-height:1.4em;margin:0 0 10px;font-weight:700"></p>
+  <button class="b" id="lb" style="width:100%">${primero?"Crear y entrar":"Entrar"}</button></div>`;
+  const go=async()=>{const err=t=>$("lerr").textContent=t;err("");
+    try{const n=$("lu").value.trim(),p=$("lp").value;
+    if(!n||p.length<4) return err("Escribe un usuario y una contraseña de al menos 4 caracteres.");
+    if(primero) return entrar(await nuevoUsuario(n,p,"admin"));
+    const u=db.users.find(x=>x.nombre.toLowerCase()===n.toLowerCase());
+    if(!u||await hash(p,u.salt)!==u.hash) return err("Usuario o contraseña incorrectos.");
+    entrar(u)}catch(x){err("Error al ingresar: "+x.message)}};
+  $("lb").onclick=go;$("lp").onkeydown=e=>{if(e.key==="Enter")go()};$("lu").focus();
+}
+const TABS=[["venta","Vender"],["cli","Clientes"],["inv","Inventario",1],["rep","Reportes",1],["aj","Ajustes",1]];
+function entrar(u){
+  me=u;SS.set("sigem_u",u.id);$("login").hidden=true;$("app").hidden=false;
+  $("nav").innerHTML=TABS.filter(t=>!t[2]||u.rol==="admin").map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join("");
+  $("quien").textContent=u.nombre+(u.rol==="admin"?" (admin)":"");
+  $("moneda").disabled=$("tasa").disabled=u.rol!=="admin";
+  showTab("venta");render();
+}
+function showTab(t){tab=t;document.querySelectorAll("section").forEach(s=>s.classList.toggle("on",s.id==="s_"+t));
+  document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===t));if(t==="rep")reporte()}
+$("nav").onclick=e=>e.target.dataset.t&&showTab(e.target.dataset.t);
+$("salir").onclick=()=>{SS.del("sigem_u");cart={};loginUI()};
+
+/* ---------- Moneda ---------- */
+function cfgChange(){const t=num($("tasa").value,1);if(!(t>0)) return aviso("Escribe una tasa de cambio mayor a 0.",true);
+  db.cfg={moneda:$("moneda").value,tasa:t};save();limpiar();render();if(tab==="rep")reporte()}
+$("moneda").onchange=cfgChange;$("tasa").onchange=cfgChange;
+
+/* ---------- Render general ---------- */
+function render(){$("moneda").value=db.cfg.moneda;$("tasa").value=db.cfg.tasa;alertas();pintarLista();pintarCarrito();pintarInv();pintarCli();pintarAj()}
+const tags=p=>(p.stock<=p.stock_minimo?'<span class="tag low">Stock bajo</span> ':'')+(p.stock_maximo>0&&p.stock>=p.stock_maximo?'<span class="tag max">Stock máximo</span>':'');
+function alertas(){const P=db.productos,bajo=P.filter(p=>p.stock<=p.stock_minimo),alto=P.filter(p=>p.stock_maximo>0&&p.stock>=p.stock_maximo);let h="";
+  if(bajo.length)h+=`<b>Reponer:</b> ${bajo.map(p=>esc(p.nombre)+" ("+p.stock+")").join(", ")}<br>`;
+  if(alto.length)h+=`<b>No comprar más:</b> ${alto.map(p=>esc(p.nombre)).join(", ")}`;
+  $("alertas").innerHTML=h;$("alertas").style.display=h?"block":"none"}
+
+/* ---------- Ventas ---------- */
+function pintarLista(){const q=$("q").value.toLowerCase();
+  $("lista").innerHTML=db.productos.filter(p=>p.nombre.toLowerCase().includes(q)||p.id.toLowerCase().includes(q)).sort((a,b)=>a.nombre.localeCompare(b.nombre))
+  .map(p=>`<button class="prod" data-id="${esc(p.id)}" ${p.stock<1?"disabled":""}><b>${esc(p.nombre)}</b><small>${esc(p.id)} · quedan ${p.stock}</small>${m(p.precio_venta)}</button>`).join("")
+  ||"<p>No hay productos. El administrador puede cargarlos en Inventario.</p>"}
+$("q").oninput=pintarLista;
+$("lista").onclick=e=>{const b=e.target.closest(".prod");if(!b)return;const p=db.productos.find(x=>x.id===b.dataset.id),n=(cart[p.id]||0)+1;
+  if(n>p.stock) return aviso("No hay más stock de "+p.nombre,true);cart[p.id]=n;pintarCarrito()};
+function pintarCarrito(){let t=0;
+  const h=Object.entries(cart).map(([id,q])=>{const p=db.productos.find(x=>x.id===id);if(!p){delete cart[id];return""}t+=q*p.precio_venta;
+    return `<tr><td>${esc(p.nombre)}</td><td><input type="number" min="1" max="${p.stock}" value="${q}" data-q="${esc(id)}" style="width:80px"></td><td class="n">${m(q*p.precio_venta)}</td><td><button class="b s" data-x="${esc(id)}">Quitar</button></td></tr>`}).join("");
+  $("carrito").innerHTML=h||"<tr><td>Toca un producto para agregarlo.</td></tr>";tot=t;$("total").textContent=m(t);
+  const sel=$("cli").value;$("cli").innerHTML='<option value="">Pago de contado</option>'+db.clientes.map(c=>`<option value="${c.id}">Crédito a ${esc(c.nombre)} (debe ${m(c.deuda)})</option>`).join("");$("cli").value=sel;vuelto()}
+$("carrito").onchange=e=>{const id=e.target.dataset.q;if(!id)return;const p=db.productos.find(x=>x.id===id);cart[id]=Math.max(1,Math.min(+e.target.value||1,p.stock));pintarCarrito()};
+$("carrito").onclick=e=>{const id=e.target.dataset.x;if(id){delete cart[id];pintarCarrito()}};
+$("vaciar").onclick=()=>{cart={};pintarCarrito()};
+function vuelto(){const r=toBase(num($("recibido").value)),cr=!!$("cli").value;let t="";
+  $("recibido").placeholder=cr?"Entrega del cliente (opcional)":"Monto recibido (opcional)";
+  if(r&&tot){if(!cr)t=r>=tot?"Vuelto: "+m(r-tot):"Faltan "+m(tot-r);
+    else t=r>=tot?"Cubre la venta completa. Vuelto: "+m(r-tot):"Entrega: "+m(r)+". Queda a crédito: "+m(tot-r)}
+  $("vuelto").textContent=t}
+$("recibido").oninput=vuelto;$("cli").onchange=vuelto;
+$("cobrar").onclick=()=>{
+  const items=Object.entries(cart).map(([id,q])=>{const p=db.productos.find(x=>x.id===id);return{id,n:p.nombre,q,pu:p.precio_venta,pc:p.precio_costo}});
+  if(!items.length) return aviso("El carrito está vacío.",true);
+  for(const i of items){const p=db.productos.find(x=>x.id===i.id);if(p.stock<i.q) return aviso("Stock insuficiente de "+p.nombre+" (quedan "+p.stock+").",true)}
+  const cid=+$("cli").value||null,total=items.reduce((a,i)=>a+i.q*i.pu,0),r=toBase(num($("recibido").value));
+  if(!cid&&r&&r<total) return aviso("El monto recibido no alcanza para el total.",true);
+  items.forEach(i=>db.productos.find(x=>x.id===i.id).stock-=i.q);
+  const entrega=cid?Math.min(r,total):0;
+  if(cid) db.clientes.find(c=>c.id===cid).deuda+=total-entrega;
+  const v={id:++db.seq.v,fecha:new Date().toISOString(),cli:cid,items,total,anulada:0,user:me.nombre,recibido:r,entrega};
+  if(entrega) db.cobros.push({fecha:v.fecha,cli:cid,monto:entrega,tipo:"pago",nota:"Entrega en venta #"+v.id,venta:v.id,recibido:r,vuelto:r-entrega,user:me.nombre});
+  db.ventas.push(v);save();ult=v;cart={};$("recibido").value="";aviso("Venta registrada: "+m(total)+(r>total?". Vuelto: "+m(r-total):""));render()};
+function verTicket(v){
+  if(!v) return aviso("Aún no hay ventas para mostrar.",true);
+  const cl=db.clientes.find(c=>c.id===v.cli);
+  $("tkpre").textContent=`SIGEM\nVenta #${v.id}  ${fecha(v.fecha)}\nAtendió: ${v.user}\n${cl?"Cliente: "+cl.nombre+" (crédito)\n":""}----------------\n${v.items.map(l=>l.n+"\n  "+l.q+" x "+m(l.pu)+" = "+m(l.q*l.pu)).join("\n")}\n----------------\nTOTAL: ${m(v.total)}${v.entrega?"\nEntrega: "+m(v.entrega)+"\nSaldo a crédito: "+m(v.total-v.entrega):""}${v.recibido>v.total?"\nRecibido: "+m(v.recibido)+"\nVuelto: "+m(v.recibido-v.total):""}${v.anulada?"\n*** VENTA ANULADA ***":""}\n\nGracias por su compra`;
+  $("tk").hidden=false}
+$("ticket").onclick=()=>verTicket(ult||db.ventas[db.ventas.length-1]);
+$("tkprint").onclick=()=>window.print();
+$("tkclose").onclick=()=>$("tk").hidden=true;
+$("tk").onclick=e=>{if(e.target.id==="tk")$("tk").hidden=true};
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){$("tk").hidden=true;$("md").hidden=true}});
+
+/* ---------- Inventario ---------- */
+function pintarInv(){$("t_inv").innerHTML="<tr><th>Código</th><th>Producto</th><th class='n'>Costo</th><th class='n'>Venta</th><th class='n'>Stock (mín–máx)</th><th>Estado</th><th></th></tr>"+
+  db.productos.map(p=>`<tr><td>${esc(p.id)}</td><td>${esc(p.nombre)}</td><td class="n">${m(p.precio_costo)}</td><td class="n">${m(p.precio_venta)}</td><td class="n">${p.stock} (${p.stock_minimo}–${p.stock_maximo})</td><td>${tags(p)}</td>
+  <td class="row"><button class="b s" data-e="${esc(p.id)}">Editar</button><button class="b d" data-d="${esc(p.id)}">Eliminar</button></td></tr>`).join("")}
+const campos={p_id:"id",p_nombre:"nombre",p_costo:"precio_costo",p_venta:"precio_venta",p_stock:"stock",p_min:"stock_minimo",p_max:"stock_maximo"};
+function limpiar(){Object.keys(campos).forEach(k=>$(k).value="");$("p_id").disabled=false;editando=null}
+$("p_limpiar").onclick=limpiar;
+$("t_inv").onclick=e=>{
+  if(e.target.dataset.e){const p=db.productos.find(x=>x.id===e.target.dataset.e);
+    Object.entries(campos).forEach(([k,f])=>$(k).value=(f==="precio_costo"||f==="precio_venta")?fromBase(p[f]):p[f]);$("p_id").disabled=true;editando=p.id;scrollTo(0,0)}
+  if(e.target.dataset.d){const id=e.target.dataset.d;ask("¿Eliminar este producto? Las ventas ya registradas no se modifican.",()=>{db.productos=db.productos.filter(p=>p.id!==id);save();render()})}};
+$("p_guardar").onclick=()=>{
+  const d={};Object.entries(campos).forEach(([k,f])=>d[f]=$(k).value);d.id=d.id.trim();d.nombre=d.nombre.trim();
+  if(!d.id||!d.nombre) return aviso("Escribe código y nombre.",true);
+  ["precio_costo","precio_venta","stock","stock_minimo","stock_maximo"].forEach(f=>d[f]=num(d[f],f.startsWith("stock"))||0);
+  if(["precio_costo","precio_venta","stock","stock_minimo","stock_maximo"].some(f=>d[f]<0)) return aviso("No se permiten valores negativos.",true);
+  d.precio_costo=toBase(d.precio_costo);d.precio_venta=toBase(d.precio_venta);d.stock=Math.round(d.stock);
+  if(editando) Object.assign(db.productos.find(x=>x.id===editando),d);
+  else{if(db.productos.some(p=>p.id===d.id)) return aviso("Ese código ya existe.",true);db.productos.push(d)}
+  save();limpiar();aviso("Producto guardado");render()};
+
+/* ---------- Clientes ---------- */
+function pintarCli(){$("t_cli").innerHTML="<tr><th>Cliente</th><th>Teléfono</th><th class='n'>Deuda</th><th></th></tr>"+
+  db.clientes.map(c=>`<tr><td>${esc(c.nombre)}</td><td>${esc(c.telefono)}</td><td class="n">${m(c.deuda)}</td><td class="row"><button class="b" data-c="${c.id}" ${c.deuda<=0?"disabled":""}>Cobrar</button>${me.rol==="admin"?`<button class="b s" data-g="${c.id}">Agregar deuda</button>`:""}<button class="b s" data-s="${c.id}">Cuenta</button></td></tr>`).join("")}
+$("c_guardar").onclick=()=>{const n=$("c_nombre").value.trim();if(!n) return aviso("Escribe el nombre del cliente.",true);
+  db.clientes.push({id:++db.seq.c,nombre:n,telefono:$("c_tel").value.trim(),deuda:0});save();$("c_nombre").value=$("c_tel").value="";render()};
+let MB=[];
+function modal(titulo,html,botones){MB=botones;$("md_t").textContent=titulo;$("md_b").innerHTML=html;
+  $("md_btn").innerHTML=botones.map((b,i)=>`<button class="b ${b[1]||""}" data-i="${i}">${b[0]}</button>`).join("");$("md").hidden=false;
+  const f=$("md_b").querySelector("input");if(f)f.select()}
+$("md_btn").onclick=e=>{const i=e.target.dataset.i;if(i===undefined)return;if(MB[i][2]()!==false)$("md").hidden=true};
+$("md").onclick=e=>{if(e.target.id==="md")$("md").hidden=true};
+$("md").onkeydown=e=>{if(e.key==="Enter"&&e.target.tagName==="INPUT")$("md_btn").querySelector("button").click()};
+/* Acepta 50000, 50.000, 50,000 y 1.234,50 */
+function num(v,miles){let s=String(v||"").trim().replace(/[^\d.,]/g,"");if(!s)return NaN;
+  const lc=s.lastIndexOf(","),ld=s.lastIndexOf(".");
+  if(lc>-1&&ld>-1) s=lc>ld?s.replace(/\./g,"").replace(",","."):s.replace(/,/g,"");
+  else if(lc>-1||ld>-1){const sep=lc>-1?",":".",pt=s.split(sep);s=(pt.length>2||(pt[1].length===3&&(miles||!usd())))?pt.join(""):pt.join(".")}
+  return parseFloat(s)}
+const tol=()=>usd()?db.cfg.tasa/200+1:1;
+const campoMonto=(c,val,nota)=>`<p style="margin-top:0"><b>${esc(c.nombre)}</b> debe <b>${m(c.deuda)}</b></p><label class="mute">Monto (${usd()?"US$":"₲"})</label><input id="mv_monto" inputmode="decimal" value="${val}"><label class="mute">${nota}</label><input id="mv_nota"><div id="mv_err" style="color:var(--bad);font-weight:700;min-height:1.4em"></div>`;
+function modalCobro(id){const c=db.clientes.find(x=>x.id===id);if(c.deuda<=0)return aviso("Este cliente no tiene deuda.",true);
+  const mon=usd()?"US$":"₲";
+  modal("Registrar cobro",`<p style="margin-top:0"><b>${esc(c.nombre)}</b> debe <b>${m(c.deuda)}</b></p>
+    <label class="mute">Monto a descontar de la deuda (${mon})</label><input id="mv_monto" inputmode="decimal" value="${fromBase(c.deuda)}">
+    <label class="mute">Monto recibido del cliente, para calcular el vuelto (opcional)</label><input id="mv_rec" inputmode="decimal">
+    <div id="mv_vuelto" style="font-weight:700;margin-top:8px;min-height:1.4em"></div>
+    <div id="mv_err" style="color:var(--bad);font-weight:700;min-height:1.4em"></div>`,
+  [["Cobrar","",()=>{const[x,r]=lee();
+    if(!(x>0)){$("mv_err").textContent="Escribe un monto mayor a 0.";return false}
+    if(x>c.deuda){$("mv_err").textContent="El monto supera la deuda ("+m(c.deuda)+").";return false}
+    if(r&&r<x){$("mv_err").textContent="El monto recibido es menor al que se descuenta.";return false}
+    c.deuda-=x;db.cobros.push({fecha:new Date().toISOString(),cli:id,monto:x,tipo:"pago",recibido:r||0,vuelto:r?r-x:0,user:me.nombre});
+    save();aviso("Cobro registrado: "+m(x)+(r>x?". Vuelto: "+m(r-x):""));render()}],["Cancelar","s",()=>{}]]);
+  function lee(){let x=toBase(num($("mv_monto").value));if(x>c.deuda&&x-c.deuda<=tol())x=c.deuda;return[x,toBase(num($("mv_rec").value))]}
+  function act(){const[x,r]=lee();$("mv_vuelto").textContent=r?(r>=x?"Vuelto a entregar: "+m(r-x):"Faltan "+m(x-r)+" para cubrir el monto"):""}
+  let tocado=false;
+  $("mv_monto").oninput=()=>{tocado=true;act()};
+  $("mv_rec").oninput=()=>{if(!tocado){const r=toBase(num($("mv_rec").value));$("mv_monto").value=fromBase(r>0?Math.min(r,c.deuda):c.deuda)}act()}}
+function modalCargo(id){const c=db.clientes.find(x=>x.id===id);
+  modal("Agregar deuda",campoMonto(c,"","Concepto (ej: saldo anterior)"),[["Agregar","",()=>{
+    const x=toBase(num($("mv_monto").value));if(!(x>0)){$("mv_err").textContent="Escribe un monto mayor a 0.";return false}
+    c.deuda+=x;db.cobros.push({fecha:new Date().toISOString(),cli:id,monto:x,tipo:"cargo",nota:$("mv_nota").value.trim(),user:me.nombre});
+    save();aviso("Deuda agregada: "+m(x));render()}],["Cancelar","s",()=>{}]])}
+function modalCuenta(id){const c=db.clientes.find(x=>x.id===id);
+  const mov=[...db.ventas.filter(v=>v.cli===id).map(v=>({f:v.fecha,t:"Venta a crédito #"+v.id+(v.anulada?" (anulada)":""),a:v.total,sg:1,x:v.anulada})),
+    ...db.cobros.filter(x=>x.cli===id).map(x=>({f:x.fecha,t:(x.tipo==="cargo"?"Deuda agregada":"Cobro")+(x.nota?": "+x.nota:"")+(x.vuelto?" (recibido "+m(x.recibido)+", vuelto "+m(x.vuelto)+")":""),a:x.monto,sg:x.tipo==="cargo"?1:-1,x:x.venta&&db.ventas.find(v=>v.id===x.venta)?.anulada}))].sort((a,b)=>a.f<b.f?1:-1);
+  modal("Cuenta de "+c.nombre,`<p style="margin-top:0">Deuda actual: <b>${m(c.deuda)}</b></p><div style="max-height:50vh;overflow:auto"><table>${mov.map(v=>`<tr><td>${fecha(v.f)}</td><td>${esc(v.t)}</td><td class="n">${v.x?"<s>":""}${v.sg>0?"+":"−"} ${m(v.a)}${v.x?"</s>":""}</td></tr>`).join("")||"<tr><td>Sin movimientos todavía.</td></tr>"}</table></div>`,
+    [["Cobrar","",()=>{setTimeout(()=>modalCobro(id))}],...(me.rol==="admin"?[["Agregar deuda","s",()=>{setTimeout(()=>modalCargo(id))}]]:[]),["Cerrar","s",()=>{}]])}
+$("t_cli").onclick=e=>{const d=e.target.dataset;if(d.c)modalCobro(+d.c);if(d.g)modalCargo(+d.g);if(d.s)modalCuenta(+d.s)};
+
+/* ---------- Reportes ---------- */
+function reporte(){
+  const p=$("periodo").value,n=new Date(),d=p==="dia"?new Date(n.getFullYear(),n.getMonth(),n.getDate()):new Date(n-(p==="semana"?7:30)*864e5);
+  const V=db.ventas.filter(v=>new Date(v.fecha)>=d).sort((a,b)=>b.id-a.id),ok=V.filter(v=>!v.anulada);
+  const T=ok.reduce((a,v)=>a+v.total,0),G=ok.reduce((a,v)=>a+v.items.reduce((s,i)=>s+i.q*(i.pu-i.pc),0),0),top={};
+  ok.forEach(v=>v.items.forEach(i=>top[i.n]=(top[i.n]||0)+i.q));
+  const C=db.cobros.filter(x=>x.tipo!=="cargo"&&!(x.venta&&db.ventas.find(v=>v.id===x.venta)?.anulada)&&new Date(x.fecha)>=d).reduce((a,x)=>a+x.monto,0);
+  $("r_total").textContent="Total vendido: "+m(T)+". Ganancia estimada: "+m(G)+". Deudas cobradas: "+m(C);
+  $("r_ventas").innerHTML="<tr><th>Fecha</th><th>Cliente</th><th>Atendió</th><th class='n'>Total</th><th></th></tr>"+V.map(v=>`<tr><td>${fecha(v.fecha)}</td><td>${esc(db.clientes.find(c=>c.id===v.cli)?.nombre||"Contado")}</td><td>${esc(v.user)}</td><td class="n">${v.anulada?"<s>"+m(v.total)+"</s>":m(v.total)}</td><td class="row"><button class="b s" data-tk="${v.id}">Ticket</button>${v.anulada?"Anulada":`<button class="b s" data-a="${v.id}">Anular</button>`}</td></tr>`).join("");
+  $("r_top").innerHTML=Object.entries(top).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([k,q])=>`<tr><td>${esc(k)}</td><td class="n">${q} u.</td></tr>`).join("")||"<tr><td>Sin ventas en este período.</td></tr>";
+  $("r_crit").innerHTML=db.productos.filter(p=>p.stock<=p.stock_minimo).map(p=>`<tr><td>${esc(p.nombre)}</td><td class="n">${p.stock} de mín. ${p.stock_minimo}</td></tr>`).join("")||"<tr><td>Todo el stock está sobre el mínimo.</td></tr>"}
+$("periodo").onchange=reporte;
+$("r_ventas").onclick=e=>{if(e.target.dataset.tk) return verTicket(db.ventas.find(x=>x.id===+e.target.dataset.tk));const id=+e.target.dataset.a;if(!id)return;
+  ask("¿Anular la venta #"+id+"? Se devuelve el stock y se descuenta de la deuda del cliente. Si el cliente dejó una entrega, deberás devolvérsela.",()=>{
+    const v=db.ventas.find(x=>x.id===id);v.items.forEach(i=>{const p=db.productos.find(x=>x.id===i.id);if(p)p.stock+=i.q});
+    if(v.cli){const c=db.clientes.find(x=>x.id===v.cli);if(c)c.deuda=Math.max(0,c.deuda-(v.total-(v.entrega||0)))}
+    v.anulada=1;save();aviso("Venta anulada");render();reporte()})};
+
+/* ---------- Ajustes: usuarios y respaldo ---------- */
+function pintarAj(){$("t_users").innerHTML="<tr><th>Usuario</th><th>Rol</th><th></th></tr>"+db.users.map(u=>`<tr><td>${esc(u.nombre)}</td><td>${u.rol==="admin"?"Administrador":"Cajero"}</td><td class="row"><button class="b s" data-pw="${u.id}">Cambiar contraseña</button><button class="b d" data-del="${u.id}">Eliminar</button></td></tr>`).join("")}
+$("u_guardar").onclick=async()=>{const n=$("u_nombre").value.trim(),p=$("u_pass").value;
+  if(!n||p.length<4) return aviso("Escribe usuario y una contraseña de al menos 4 caracteres.",true);
+  if(db.users.some(u=>u.nombre.toLowerCase()===n.toLowerCase())) return aviso("Ese usuario ya existe.",true);
+  await nuevoUsuario(n,p,$("u_rol").value);$("u_nombre").value=$("u_pass").value="";aviso("Usuario agregado");pintarAj()};
+function ask(texto,fn,ok){modal("Confirmar",`<p style="margin:0">${esc(texto)}</p>`,[[ok||"Sí, continuar","d",()=>{setTimeout(fn)}],["Cancelar","s",()=>{}]])}
+$("t_users").onclick=e=>{
+  const pw=+e.target.dataset.pw,del=+e.target.dataset.del;
+  if(pw){const u=db.users.find(x=>x.id===pw);
+    modal("Nueva contraseña para "+u.nombre,`<label class="mute">Mínimo 4 caracteres</label><input id="np" type="password" autocomplete="new-password"><div id="np_err" style="color:var(--bad);font-weight:700;min-height:1.4em"></div>`,
+      [["Guardar","",()=>{const p=$("np").value;if(p.length<4){$("np_err").textContent="La contraseña debe tener al menos 4 caracteres.";return false}
+        const salt=Math.random().toString(36).slice(2);hash(p,salt).then(h=>{u.salt=salt;u.hash=h;save();aviso("Contraseña actualizada")})}],["Cancelar","s",()=>{}]])}
+  if(del){const u=db.users.find(x=>x.id===del);
+    if(u.id===me.id) return aviso("No puedes eliminar tu propio usuario.",true);
+    if(u.rol==="admin"&&db.users.filter(x=>x.rol==="admin").length<2) return aviso("Debe quedar al menos un administrador.",true);
+    ask("¿Eliminar al usuario "+u.nombre+"?",()=>{db.users=db.users.filter(x=>x.id!==del);save();pintarAj()})}};
+
+/* Respaldo: descarga, compartir (celular), copiar texto y restaurar desde archivo o texto pegado */
+const respaldoTxt=()=>JSON.stringify(db), nombreResp=()=>"sigem-"+new Date().toISOString().slice(0,10)+".json";
+$("exp").onclick=async()=>{
+  const blob=new Blob([respaldoTxt()],{type:"application/octet-stream"});
+  try{const f=new File([blob],nombreResp(),{type:"application/json"});
+    if(/Android|iPhone|iPad/i.test(navigator.userAgent)&&navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:"Respaldo SIGEM"});return}
+  }catch(e){if(e.name==="AbortError")return}
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nombreResp();a.style.display="none";document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},5000);
+  aviso("Si el navegador bloquea la descarga, usa «Copiar respaldo».")};
+const copiar=async t=>{try{await navigator.clipboard.writeText(t.value);return true}catch(e){}try{t.select();return document.execCommand("copy")}catch(e){return false}};
+$("cpy").onclick=()=>{modal("Respaldo en texto",`<p class="mute" style="margin-top:0">Copia este texto y guárdalo en una nota, un correo o un archivo. Para restaurar usa «Restaurar pegando texto».</p><textarea id="rs_txt" readonly rows="8" style="width:100%;font:12px monospace"></textarea>`,
+  [["Copiar","",()=>{copiar($("rs_txt")).then(ok=>aviso(ok?"Respaldo copiado":"Selecciona el texto y cópialo manualmente.",!ok));return false}],["Cerrar","s",()=>{}]]);
+  $("rs_txt").value=respaldoTxt()};
+function restaurar(txt){
+  try{const d=JSON.parse(txt);if(!Array.isArray(d.users)||!Array.isArray(d.productos)||!d.users.some(u=>u.rol==="admin")) throw 0;
+    d.clientes=d.clientes||[];d.ventas=d.ventas||[];d.cobros=d.cobros||[];d.cfg=d.cfg||{moneda:"PYG",tasa:7500};d.seq=d.seq||{v:0,c:0,u:0};
+    ask("Esto reemplaza TODOS los datos actuales con los del respaldo. ¿Continuar?",()=>{db=d;save();SS.del("sigem_u");loginUI();aviso("Respaldo restaurado. Ingresa con un usuario del respaldo.")},"Sí, restaurar")}
+  catch(x){aviso("El archivo o texto no es un respaldo válido de SIGEM.",true)}}
+$("imp").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>restaurar(r.result);r.onerror=()=>aviso("No se pudo leer el archivo.",true);r.readAsText(f);e.target.value=""};
+$("pst").onclick=()=>modal("Restaurar pegando texto",`<textarea id="rs_in" rows="8" placeholder="Pega aquí el respaldo copiado" style="width:100%;font:12px monospace"></textarea>`,
+  [["Restaurar","d",()=>{const t=$("rs_in").value.trim();if(!t){aviso("Pega primero el texto del respaldo.",true);return false}setTimeout(()=>restaurar(t))}],["Cancelar","s",()=>{}]]);
+
+/* ---------- Inicio ---------- */
+const su=db.users.find(x=>x.id===+SS.get("sigem_u"));
+su?entrar(su):loginUI();
+</script>
+</body>
+</html>
